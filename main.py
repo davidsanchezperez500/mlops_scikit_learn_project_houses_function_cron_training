@@ -3,7 +3,7 @@
 import base64
 import json
 import os
-import time # Para el timestamp en el display_name
+import time
 from google.cloud import aiplatform
 
 # ==============================================================================
@@ -15,7 +15,7 @@ REGION = os.environ.get('GCP_REGION')
 TRAINING_IMAGE_URI = os.environ.get('TRAINING_IMAGE_URI')
 GCS_DATA_PATH = os.environ.get('GCS_DATA_PATH')
 GCS_MODEL_OUTPUT_DIR = os.environ.get('GCS_MODEL_OUTPUT_DIR')
-TRAINING_SERVICE_ACCOUNT = os.environ.get('TRAINING_SERVICE_ACCOUNT') # Nueva variable para la cuenta de servicio del job
+TRAINING_SERVICE_ACCOUNT = os.environ.get('TRAINING_SERVICE_ACCOUNT')
 
 def trigger_vertex_ai_retraining(event, context):
     """
@@ -58,25 +58,39 @@ def trigger_vertex_ai_retraining(event, context):
         staging_bucket_name = GCS_MODEL_OUTPUT_DIR.split('/')[2]
         staging_bucket_uri = f"gs://{staging_bucket_name}"
 
-        # Configuración del trabajo personalizado
+        # ======================================================================
+        # CAMBIO CLAVE AQUÍ: Usar worker_pool_specs en lugar de container_uri directo
+        # ======================================================================
         job = aiplatform.CustomJob(
             display_name=job_display_name,
-            container_uri=TRAINING_IMAGE_URI,
-            command=[], # No es necesario si el ENTRYPOINT del Dockerfile ya ejecuta el script
-            args=[
-                f"--data-path={GCS_DATA_PATH}",
-                f"--model-dir={GCS_MODEL_OUTPUT_DIR}"
+            # La especificación del contenedor va dentro de worker_pool_specs
+            worker_pool_specs=[
+                {
+                    "machine_spec": {
+                        "machine_type": "n1-standard-4", # Tipo de máquina para el job de entrenamiento
+                        "accelerator_type": None, # Puedes especificar "NVIDIA_TESLA_T4" si usas GPU
+                        "accelerator_count": 0, # Número de GPUs
+                    },
+                    "replica_count": 1, # Número de réplicas de workers
+                    "container_spec": {
+                        "image_uri": TRAINING_IMAGE_URI, # Aquí va la URI de la imagen de entrenamiento
+                        "command": [], # No es necesario si el ENTRYPOINT del Dockerfile ya ejecuta el script
+                        "args": [
+                            f"--data-path={GCS_DATA_PATH}",
+                            f"--model-dir={GCS_MODEL_OUTPUT_DIR}"
+                        ],
+                    },
+                }
             ],
-            requirements=[], # No es necesario si las dependencias están en la imagen
             project=PROJECT_ID,
             location=REGION,
-            staging_bucket=staging_bucket_uri # Usar el bucket de salida del modelo para staging
+            staging_bucket=staging_bucket_uri
         )
 
         # Iniciar el trabajo
         print(f"Lanzando trabajo de entrenamiento personalizado: {job_display_name}")
         job.run(
-            service_account=TRAINING_SERVICE_ACCOUNT, # Usar la cuenta de servicio especificada
+            service_account=TRAINING_SERVICE_ACCOUNT,
             sync=False # No esperar a que el trabajo termine, solo lanzarlo
         )
         print(f"Trabajo de entrenamiento {job_display_name} lanzado exitosamente.")

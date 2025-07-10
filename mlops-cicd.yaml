@@ -4,8 +4,7 @@ on:
   push:
     branches:
       - function_pipeline
-    
-  workflow_dispatch:
+    workflow_dispatch:
 
 jobs:
   deploy_furnction:
@@ -43,15 +42,18 @@ jobs:
       
       - name: "Deploy Cloud Function for Vertex AI Retraining Trigger"
         run: |
-              gcloud functions deploy trigger_vertex_ai_retraining \
-              --gen2 \
-              --runtime python310 \
-              --trigger-topic model-retrain-trigger-topic \
-              --entry-point trigger_vertex_ai_retraining \
-              --region=${GCP_REGION} \
-              --project=${GCP_PROJECT_ID} \
-              --set-env-vars "GCP_PROJECT_ID=${GCP_PROJECT_ID},GCP_REGION=${GCP_REGION},TRAINING_IMAGE_URI=${TRAINING_IMAGE_URI},GCS_DATA_PATH=${GCS_DATA_PATH},GCS_MODEL_OUTPUT_DIR=${GCS_MODEL_OUTPUT_DIR},TRAINING_SERVICE_ACCOUNT=${TRAINING_SERVICE_ACCOUNT}" \
 
-
-
-
+          gcloud functions deploy trigger_vertex_ai_retraining \
+            --runtime python310 \
+            --trigger-topic model-retrain-trigger-topic \
+            --entry-point trigger_vertex_ai_retraining \
+            --region=${GCP_REGION} \
+            --project=${GCP_PROJECT_ID} \
+            --set-env-vars \
+              GCP_PROJECT_ID=${GCP_PROJECT_ID},\
+              GCP_REGION=${GCP_REGION},\
+              TRAINING_IMAGE_URI=${TRAINING_IMAGE_URI},\
+              GCS_DATA_PATH=${GCS_DATA_PATH},\
+              GCS_MODEL_OUTPUT_DIR=${GCS_MODEL_OUTPUT_DIR},\
+              TRAINING_SERVICE_ACCOUNT=${TRAINING_SERVICE_ACCOUNT} \ 
+            --service-account=${GCP_SERVICE_ACCOUNT}
